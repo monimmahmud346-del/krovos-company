@@ -113,9 +113,10 @@ function goTo(page) { window.location.href = page; }
 
 async function loadDashboard() {
   // Stats
+  const roleFilter = (user.role === 'BOARD' || user.role === 'CEO') ? '' : `assigned_role=eq.${user.role}`;
   const [tasks, clients] = await Promise.all([
-    db.query('tasks', { filter: user.role === 'BOARD' ? '' : `assigned_role=eq.${user.role}` }),
-    db.query('clients', { filter: user.role === 'BOARD' ? '' : `assigned_role=eq.${user.role}` })
+    db.query('tasks', { filter: roleFilter }),
+    db.query('clients', { filter: roleFilter })
   ]);
 
   const pending = (tasks || []).filter(t => t.status === 'pending').length;
