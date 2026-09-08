@@ -123,11 +123,10 @@ async function addOfficer() {
 
   if (!name || !email || !pass) return alert('সব field পূরণ করুন।');
 
-  await db.insert('officers', {
+ await db.insert('officers', {
     name, email, role,
-    password_hash: pass, // plain for demo
-    plain_password: pass
-  });
+    password_hash: pass
+});
 
   closeModal();
   loadOfficers();
