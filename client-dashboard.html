@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Krovos — My Dashboard</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="mark">K</div><h2>Krovos</h2></div>
+    <div class="sidebar-user">
+      <div class="role-pill" id="sideRole"></div>
+      <div class="uname" id="sideName"></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active"><span class="icon">📊</span> My Dashboard</div>
+    </nav>
+    <div class="sidebar-bottom"><button class="btn-outline" style="width:100%" onclick="auth.logout()">Logout</button></div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>স্বাগতম, <span id="clientNameTop"></span></h1>
+        <div style="color:var(--muted);font-size:13px;margin-top:2px" id="dateStr"></div>
+      </div>
+      <button class="btn-outline" onclick="loadClientData()">🔄 Refresh</button>
+    </div>
+
+    <div class="cards-grid" id="statsGrid"></div>
+
+    <div class="section-title">লাইভ কাজের অবস্থা</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Task</th><th>Priority</th><th>Status</th><th>তারিখ</th></tr>
+        </thead>
+        <tbody id="taskTable"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+const user = auth.require();
+if (user.role !== 'CLIENT') window.location.href = 'dashboard.html';
+
+const clientColor = ROLE_COLORS.CLIENT || '#22c55e';
+document.getElementById('sideRole').textContent = 'CLIENT';
+document.getElementById('sideRole').style.cssText = `background:${clientColor}22;color:${clientColor}`;
+document.getElementById('sideName').textContent = user.name;
+document.getElementById('clientNameTop').textContent = user.name;
+
+document.getElementById('dateStr').textContent = new Date().toLocaleDateString('bn-BD', {
+  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+});
+
+async function loadClientData() {
+  const tasks = await db.query('tasks', { filter: `client_id=eq.${user.id}`, order: 'created_at.desc' }) || [];
+
+  const pending = tasks.filter(t => t.status === 'pending').length;
+  const inProgress = tasks.filter(t => t.status === 'in_progress').length;
+  const completed = tasks.filter(t => t.status === 'completed').length;
+
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card"><div class="label">মোট কাজ</div><div class="value" style="color:${clientColor}">${tasks.length}</div></div>
+    <div class="stat-card"><div class="label">Pending</div><div class="value" style="color:#f59e0b">${pending}</div></div>
+    <div class="stat-card"><div class="label">চলমান</div><div class="value" style="color:#3b82f6">${inProgress}</div></div>
+    <div class="stat-card"><div class="label">সম্পন্ন</div><div class="value" style="color:#10b981">${completed}</div></div>
+  `;
+
+  const tbody = document.getElementById('taskTable');
+  if (tasks.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">এখনো কোনো কাজ assign হয়নি</td></tr>';
+    return;
+  }
+  tbody.innerHTML = tasks.map(t => `
+    <tr>
+      <td><div style="font-weight:500">${t.title}</div>${t.description ? `<div style="color:var(--muted);font-size:12px;margin-top:2px">${t.description}</div>` : ''}</td>
+      <td><span class="badge badge-${t.priority}">${t.priority}</span></td>
+      <td><span class="badge badge-${t.status}">${t.status.replace('_',' ')}</span></td>
+      <td style="color:var(--muted)">${new Date(t.created_at).toLocaleDateString('bn-BD')}</td>
+    </tr>
+  `).join('');
+}
+
+loadClientData();
+setInterval(loadClientData, 30000);
+</script>
+</body>
+</html>
