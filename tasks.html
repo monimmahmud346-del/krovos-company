@@ -78,6 +78,10 @@
       </select>
     </div>
     <div class="form-group">
+      <label>Client (ঐচ্ছিক)</label>
+      <select id="tClient"><option value="">— কোনো client না —</option></select>
+    </div>
+    <div class="form-group">
       <label>Due Date</label>
       <input type="date" id="tDue" />
     </div>
@@ -99,9 +103,23 @@ if (user.role === 'BOARD') document.querySelectorAll('.board-only').forEach(el =
 
 let allTasks = [];
 let currentFilter = 'all';
+let clientMap = {};
+
+async function loadClientOptions() {
+  const filter = (user.role === 'BOARD' || user.role === 'CEO') ? '' : `assigned_role=eq.${user.role}`;
+  const clients = await db.query('clients', { filter }) || [];
+  clientMap = Object.fromEntries(clients.map(c => [c.id, c]));
+  const sel = document.getElementById('tClient');
+  clients.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = `${c.name} (${c.user_id})`;
+    sel.appendChild(opt);
+  });
+}
 
 async function loadTasks() {
-  const filter = user.role === 'BOARD' ? '' : `assigned_role=eq.${user.role}`;
+  const filter = (user.role === 'BOARD' || user.role === 'CEO') ? '' : `assigned_role=eq.${user.role}`;
   allTasks = await db.query('tasks', { filter, order: 'created_at.desc' }) || [];
   renderTasks();
 }
@@ -117,6 +135,7 @@ function renderTasks() {
     <tr>
       <td>
         <div style="font-weight:500">${t.title}</div>
+        ${t.client_id && clientMap[t.client_id] ? `<div style="color:var(--accent);font-size:11px;margin-top:2px">👤 ${clientMap[t.client_id].name}</div>` : ''}
         ${t.description ? `<div style="color:var(--muted);font-size:12px;margin-top:2px">${t.description.substring(0,60)}...</div>` : ''}
       </td>
       <td><span class="badge badge-${t.priority}">${t.priority}</span></td>
@@ -163,6 +182,7 @@ async function addTask() {
     description: document.getElementById('tDesc').value.trim(),
     priority: document.getElementById('tPriority').value,
     due_date: document.getElementById('tDue').value || null,
+    client_id: document.getElementById('tClient').value || null,
     assigned_role: user.role,
     created_by: user.id,
     assigned_to: user.id,
@@ -176,6 +196,7 @@ async function addTask() {
 function openModal() { document.getElementById('addModal').classList.add('open'); }
 function closeModal() { document.getElementById('addModal').classList.remove('open'); }
 
+loadClientOptions();
 loadTasks();
 </script>
 </body>
