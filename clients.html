@@ -77,6 +77,10 @@
       <input type="text" id="cCompany" placeholder="কোম্পানির নাম" />
     </div>
     <div class="form-group">
+      <label>Password (Client Login) *</label>
+      <input type="text" id="cPassword" placeholder="Client-কে দেওয়ার জন্য password" />
+    </div>
+    <div class="form-group">
       <label>Notes</label>
       <textarea id="cNotes" placeholder="কোনো বিশেষ তথ্য..."></textarea>
     </div>
@@ -113,7 +117,7 @@ function genUserId() {
 }
 
 async function loadClients() {
-  const filter = user.role === 'BOARD' ? '' : `assigned_role=eq.${user.role}`;
+  const filter = (user.role === 'BOARD' || user.role === 'CEO') ? '' : `assigned_role=eq.${user.role}`;
   allClients = await db.query('clients', { filter, order: 'created_at.desc' }) || [];
   renderTable(allClients);
 }
@@ -152,15 +156,18 @@ function filterClients() {
 
 async function addClient() {
   const name = document.getElementById('cName').value.trim();
+  const password = document.getElementById('cPassword').value.trim();
   if (!name) return alert('নাম দিন।');
-
+  if (!password) return alert('Client Login Password দিন।');
+  const userId = genUserId();
   const data = {
-    user_id: genUserId(),
+    user_id: userId,
     name,
     email: document.getElementById('cEmail').value.trim(),
     phone: document.getElementById('cPhone').value.trim(),
     company: document.getElementById('cCompany').value.trim(),
     notes: document.getElementById('cNotes').value.trim(),
+    password,
     assigned_role: user.role,
     added_by: user.id,
     status: 'active'
@@ -170,11 +177,12 @@ async function addClient() {
   await db.insert('activity_log', {
     officer_id: user.id,
     action: 'client_added',
-    details: `New client added: ${name} (${data.user_id})`
+    details: `New client added: ${name} (${userId})`
   });
 
   closeModal();
   loadClients();
+  alert(`Client তৈরি হয়েছে!\n\nLogin ID: ${userId}\nPassword: ${password}\n\nএই তথ্য client-কে দিয়ে দিন।`);
 }
 
 async function viewClient(id) {
