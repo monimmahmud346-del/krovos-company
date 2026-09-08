@@ -75,7 +75,7 @@ const auth = {
 // Role colors
 const ROLE_COLORS = {
   CEO: '#f59e0b', COO: '#3b82f6', CTO: '#8b5cf6',
-  CFO: '#10b981', CMO: '#ec4899', BOARD: '#ff6b6b'
+  CFO: '#10b981', CMO: '#ec4899', BOARD: '#ff6b6b',CLIENT: '#22c55e',
 };
 
 const ROLE_RESPONSIBILITIES = {
