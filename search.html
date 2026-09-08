@@ -44,6 +44,7 @@
 <script src="js/config.js"></script>
 <script>
 const user = auth.require();
+if (user.role === 'CLIENT') window.location.href = 'client-dashboard.html';
 const color = ROLE_COLORS[user.role] || '#4f7fff';
 document.getElementById('sideRole').textContent = user.role;
 document.getElementById('sideRole').style.cssText = `background:${color}22;color:${color}`;
