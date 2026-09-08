@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Krovos — Officers</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="mark">K</div><h2>Krovos</h2></div>
+    <div class="sidebar-user">
+      <div class="role-pill" id="sideRole"></div>
+      <div class="uname" id="sideName"></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="location.href='dashboard.html'"><span class="icon">📊</span> Dashboard</div>
+      <div class="nav-item" onclick="location.href='workflow.html'"><span class="icon">⚡</span> Daily Workflow</div>
+      <div class="nav-item" onclick="location.href='clients.html'"><span class="icon">👥</span> Clients</div>
+      <div class="nav-item" onclick="location.href='tasks.html'"><span class="icon">✅</span> Tasks</div>
+      <div class="nav-item" onclick="location.href='search.html'"><span class="icon">🔍</span> Search</div>
+      <div class="nav-item" onclick="location.href='constitution.html'"><span class="icon">📜</span> Constitution</div>
+      <div class="nav-item active"><span class="icon">🏛️</span> Officers</div>
+    </nav>
+    <div class="sidebar-bottom"><button class="btn-outline" style="width:100%" onclick="auth.logout()">Logout</button></div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>Officers Management</h1>
+      <button class="btn-outline" onclick="openModal()">+ Add Officer</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>নাম</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Joined</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="officerTable"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- Add Officer Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <h2>New Officer Add করুন</h2>
+    <div class="form-group">
+      <label>নাম *</label>
+      <input type="text" id="oName" placeholder="Officer-এর নাম" />
+    </div>
+    <div class="form-group">
+      <label>Email *</label>
+      <input type="email" id="oEmail" placeholder="officer@krovos.com" />
+    </div>
+    <div class="form-group">
+      <label>Role *</label>
+      <select id="oRole">
+        <option value="CEO">CEO</option>
+        <option value="COO">COO</option>
+        <option value="CTO">CTO</option>
+        <option value="CFO">CFO</option>
+        <option value="CMO">CMO</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Password *</label>
+      <input type="text" id="oPass" placeholder="Initial password" />
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" style="width:auto;padding:10px 24px" onclick="addOfficer()">Add Officer</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+const user = auth.require();
+if (user.role !== 'BOARD') location.href = 'dashboard.html';
+
+const color = ROLE_COLORS[user.role] || '#4f7fff';
+document.getElementById('sideRole').textContent = user.role;
+document.getElementById('sideRole').style.cssText = `background:${color}22;color:${color}`;
+document.getElementById('sideName').textContent = user.name;
+
+async function loadOfficers() {
+  const officers = await db.query('officers', { order: 'created_at.asc' }) || [];
+  const tbody = document.getElementById('officerTable');
+  if (officers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">কোনো officer নেই</td></tr>';
+    return;
+  }
+  tbody.innerHTML = officers.map(o => {
+    const rc = ROLE_COLORS[o.role] || '#6b7280';
+    return `
+      <tr>
+        <td><strong>${o.name}</strong></td>
+        <td style="color:var(--muted)">${o.email}</td>
+        <td><span class="badge" style="background:${rc}22;color:${rc}">${o.role}</span></td>
+        <td style="color:var(--muted)">${new Date(o.created_at).toLocaleDateString('bn-BD')}</td>
+        <td>
+          ${o.role !== 'BOARD' ? `<button class="btn-sm" style="background:var(--danger);color:white" onclick="removeOfficer('${o.id}','${o.name}')">Remove</button>` : '—'}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function addOfficer() {
+  const name = document.getElementById('oName').value.trim();
+  const email = document.getElementById('oEmail').value.trim();
+  const role = document.getElementById('oRole').value;
+  const pass = document.getElementById('oPass').value.trim();
+
+  if (!name || !email || !pass) return alert('সব field পূরণ করুন।');
+
+  await db.insert('officers', {
+    name, email, role,
+    password_hash: pass, // plain for demo
+    plain_password: pass
+  });
+
+  closeModal();
+  loadOfficers();
+}
+
+async function removeOfficer(id, name) {
+  if (!confirm(`${name}-কে remove করবেন?`)) return;
+  await db.delete('officers', id);
+  loadOfficers();
+}
+
+function openModal() { document.getElementById('addModal').classList.add('open'); }
+function closeModal() { document.getElementById('addModal').classList.remove('open'); }
+
+loadOfficers();
+</script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Krovos — Search</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="mark">K</div><h2>Krovos</h2></div>
+    <div class="sidebar-user">
+      <div class="role-pill" id="sideRole"></div>
+      <div class="uname" id="sideName"></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="location.href='dashboard.html'"><span class="icon">📊</span> Dashboard</div>
+      <div class="nav-item" onclick="location.href='workflow.html'"><span class="icon">⚡</span> Daily Workflow</div>
+      <div class="nav-item" onclick="location.href='clients.html'"><span class="icon">👥</span> Clients</div>
+      <div class="nav-item" onclick="location.href='tasks.html'"><span class="icon">✅</span> Tasks</div>
+      <div class="nav-item active"><span class="icon">🔍</span> Search</div>
+      <div class="nav-item" onclick="location.href='constitution.html'"><span class="icon">📜</span> Constitution</div>
+      <div class="nav-item board-only" onclick="location.href='officers.html'" style="display:none"><span class="icon">🏛️</span> Officers</div>
+    </nav>
+    <div class="sidebar-bottom"><button class="btn-outline" style="width:100%" onclick="auth.logout()">Logout</button></div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar"><h1>Search</h1></div>
+
+    <div class="search-box" style="margin-bottom:12px">
+      <span style="font-size:20px">🔍</span>
+      <input type="text" id="searchInput" placeholder="Client ID, নাম, task, keyword..." oninput="doSearch()" autofocus />
+    </div>
+    <div style="color:var(--muted);font-size:12px;margin-bottom:24px">Clients, Tasks, ও Activity সব একসাথে খুঁজুন</div>
+
+    <div id="resultsArea">
+      <div class="empty" style="margin-top:60px">কিছু লিখুন...</div>
+    </div>
+  </main>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+const user = auth.require();
+const color = ROLE_COLORS[user.role] || '#4f7fff';
+document.getElementById('sideRole').textContent = user.role;
+document.getElementById('sideRole').style.cssText = `background:${color}22;color:${color}`;
+document.getElementById('sideName').textContent = user.name;
+if (user.role === 'BOARD') document.querySelectorAll('.board-only').forEach(el => el.style.display = 'flex');
+
+let searchTimer;
+
+async function doSearch() {
+  const q = document.getElementById('searchInput').value.trim();
+  if (q.length < 2) {
+    document.getElementById('resultsArea').innerHTML = '<div class="empty" style="margin-top:60px">কিছু লিখুন...</div>';
+    return;
+  }
+
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(async () => {
+    document.getElementById('resultsArea').innerHTML = '<div class="empty">খুঁজছি...</div>';
+
+    const [clients, tasks, logs] = await Promise.all([
+      db.query('clients', { filter: '' }),
+      db.query('tasks', { filter: '' }),
+      db.query('activity_log', { filter: '', order: 'created_at.desc', limit: 200 })
+    ]);
+
+    const ql = q.toLowerCase();
+
+    const matchedClients = (clients || []).filter(c =>
+      c.user_id.toLowerCase().includes(ql) ||
+      c.name.toLowerCase().includes(ql) ||
+      (c.company || '').toLowerCase().includes(ql) ||
+      (c.phone || '').includes(ql) ||
+      (c.email || '').toLowerCase().includes(ql)
+    );
+
+    const matchedTasks = (tasks || []).filter(t =>
+      t.title.toLowerCase().includes(ql) ||
+      (t.description || '').toLowerCase().includes(ql) ||
+      (t.assigned_role || '').toLowerCase().includes(ql)
+    );
+
+    const matchedLogs = (logs || []).filter(l =>
+      (l.action || '').toLowerCase().includes(ql) ||
+      (l.details || '').toLowerCase().includes(ql)
+    );
+
+    const total = matchedClients.length + matchedTasks.length + matchedLogs.length;
+
+    if (total === 0) {
+      document.getElementById('resultsArea').innerHTML = '<div class="empty" style="margin-top:40px">কোনো ফলাফল পাওয়া যায়নি।</div>';
+      return;
+    }
+
+    let html = `<div style="color:var(--muted);font-size:13px;margin-bottom:20px">${total}টি ফলাফল পাওয়া গেছে</div>`;
+
+    if (matchedClients.length > 0) {
+      html += `<div class="section-title">👥 Clients (${matchedClients.length})</div>`;
+      html += '<div class="table-wrap" style="margin-bottom:24px"><table><thead><tr><th>Client ID</th><th>নাম</th><th>কোম্পানি</th><th>Status</th></tr></thead><tbody>';
+      html += matchedClients.map(c => `
+        <tr onclick="location.href='clients.html'" style="cursor:pointer">
+          <td><span class="client-id">${highlight(c.user_id, q)}</span></td>
+          <td><strong>${highlight(c.name, q)}</strong></td>
+          <td>${highlight(c.company || '—', q)}</td>
+          <td><span class="badge badge-${c.status}">${c.status}</span></td>
+        </tr>
+      `).join('');
+      html += '</tbody></table></div>';
+    }
+
+    if (matchedTasks.length > 0) {
+      html += `<div class="section-title">✅ Tasks (${matchedTasks.length})</div>`;
+      html += '<div class="table-wrap" style="margin-bottom:24px"><table><thead><tr><th>Task</th><th>Role</th><th>Priority</th><th>Status</th></tr></thead><tbody>';
+      html += matchedTasks.map(t => `
+        <tr onclick="location.href='tasks.html'" style="cursor:pointer">
+          <td>${highlight(t.title, q)}</td>
+          <td style="color:${ROLE_COLORS[t.assigned_role]||'var(--muted)'}">${t.assigned_role || '—'}</td>
+          <td><span class="badge badge-${t.priority}">${t.priority}</span></td>
+          <td><span class="badge badge-${t.status}">${t.status}</span></td>
+        </tr>
+      `).join('');
+      html += '</tbody></table></div>';
+    }
+
+    if (matchedLogs.length > 0) {
+      html += `<div class="section-title">📋 Activity Log (${matchedLogs.length})</div>`;
+      html += '<div class="table-wrap"><table><thead><tr><th>Action</th><th>Details</th><th>Time</th></tr></thead><tbody>';
+      html += matchedLogs.slice(0,20).map(l => `
+        <tr>
+          <td><code style="font-size:12px;color:var(--accent)">${l.action}</code></td>
+          <td style="color:var(--muted);font-size:12px">${highlight(l.details || '—', q)}</td>
+          <td style="color:var(--muted);font-size:12px">${new Date(l.created_at).toLocaleString('bn-BD')}</td>
+        </tr>
+      `).join('');
+      html += '</tbody></table></div>';
+    }
+
+    document.getElementById('resultsArea').innerHTML = html;
+  }, 300);
+}
+
+function highlight(text, query) {
+  if (!query) return text;
+  const re = new RegExp(`(${query})`, 'gi');
+  return String(text).replace(re, '<mark style="background:#4f7fff33;color:#4f7fff;border-radius:2px">$1</mark>');
+}
+</script>
+</body>
+</html>

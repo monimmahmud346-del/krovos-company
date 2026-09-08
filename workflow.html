@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Krovos — Daily Workflow</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="mark">K</div><h2>Krovos</h2></div>
+    <div class="sidebar-user">
+      <div class="role-pill" id="sideRole"></div>
+      <div class="uname" id="sideName"></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="location.href='dashboard.html'"><span class="icon">📊</span> Dashboard</div>
+      <div class="nav-item active"><span class="icon">⚡</span> Daily Workflow</div>
+      <div class="nav-item" onclick="location.href='clients.html'"><span class="icon">👥</span> Clients</div>
+      <div class="nav-item" onclick="location.href='tasks.html'"><span class="icon">✅</span> Tasks</div>
+      <div class="nav-item" onclick="location.href='search.html'"><span class="icon">🔍</span> Search</div>
+      <div class="nav-item" onclick="location.href='constitution.html'"><span class="icon">📜</span> Constitution</div>
+      <div class="nav-item board-only" onclick="location.href='officers.html'" style="display:none"><span class="icon">🏛️</span> Officers</div>
+    </nav>
+    <div class="sidebar-bottom"><button class="btn-outline" style="width:100%" onclick="auth.logout()">Logout</button></div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>Daily Workflow</h1>
+        <div style="color:var(--muted);font-size:13px;margin-top:2px">Live — প্রতি role-এর আজকের কাজ</div>
+      </div>
+      <button class="btn-outline" onclick="loadWorkflow()">🔄 Refresh</button>
+    </div>
+
+    <!-- Workflow Kanban by Role -->
+    <div class="workflow-grid" id="workflowGrid"></div>
+  </main>
+</div>
+
+<script src="js/config.js"></script>
+<script>
+const user = auth.require();
+const color = ROLE_COLORS[user.role] || '#4f7fff';
+document.getElementById('sideRole').textContent = user.role;
+document.getElementById('sideRole').style.cssText = `background:${color}22;color:${color}`;
+document.getElementById('sideName').textContent = user.name;
+if (user.role === 'BOARD') document.querySelectorAll('.board-only').forEach(el => el.style.display = 'flex');
+
+const ROLES = ['CEO', 'COO', 'CTO', 'CFO', 'CMO'];
+
+async function loadWorkflow() {
+  const tasks = await db.query('tasks', {
+    filter: 'status=in.(pending,in_progress)',
+    order: 'created_at.desc'
+  }) || [];
+
+  const grid = document.getElementById('workflowGrid');
+  grid.innerHTML = ROLES.map(role => {
+    const roleTasks = tasks.filter(t => t.assigned_role === role);
+    const rc = ROLE_COLORS[role];
+    const inProg = roleTasks.filter(t => t.status === 'in_progress');
+    const pending = roleTasks.filter(t => t.status === 'pending');
+
+    return `
+      <div class="workflow-col">
+        <div class="workflow-col-head" style="background:${rc}22;color:${rc}">
+          ${role}
+          <span style="background:${rc};color:white;border-radius:10px;padding:2px 8px;font-size:10px;margin-left:6px">${roleTasks.length}</span>
+        </div>
+        <div class="workflow-tasks">
+          ${inProg.length > 0 ? `
+            <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">In Progress</div>
+            ${inProg.map(t => taskCard(t, rc)).join('')}
+          ` : ''}
+          ${pending.length > 0 ? `
+            <div style="font-size:10px;color:var(--muted);margin:8px 0 6px;text-transform:uppercase;letter-spacing:0.5px">Pending</div>
+            ${pending.map(t => taskCard(t, '#6b7280')).join('')}
+          ` : ''}
+          ${roleTasks.length === 0 ? '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0">কোনো active task নেই</div>' : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function taskCard(t, borderColor) {
+  return `
+    <div class="workflow-task" style="border-left:3px solid ${borderColor}">
+      <div class="t-title">${t.title}</div>
+      <div class="t-meta">
+        <span class="badge badge-${t.priority}" style="font-size:10px;padding:2px 6px">${t.priority}</span>
+        ${t.due_date ? `<span style="margin-left:6px">📅 ${t.due_date}</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+loadWorkflow();
+// Auto-refresh every 30 seconds
+setInterval(loadWorkflow, 30000);
+</script>
+</body>
+</html>
